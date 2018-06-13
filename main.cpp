@@ -49,19 +49,23 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Found biggest bounding box: " << biggest_bb << std::endl;
 
+    double confidence = 1.0;
+    const double decreasing_factor = 0.9;
+    const double hard_decreasing_factor = 0.8;
+
     if (biggest_bb.width != biggest_bb.height) {
-        std::cout << "Unknown shape. Bounding box has different width and height." << std::endl;
-        return 0;
+        std::cout << "Bounding box has different width and height." << std::endl;
+        confidence *= hard_decreasing_factor;
     }
     if (biggest_bb.width < 5) {
-        std::cout << "Unknown shape. Width is too small to be valid. Actual: "
-                  << biggest_bb.width << ", expected greater than 5." << std::endl;
-        return 0;
+        std::cout << "Width is too small to be valid. Actual: "
+                  << biggest_bb.width << ", expected in range [5, 10]." << std::endl;
+        confidence *= hard_decreasing_factor;
     }
     if (biggest_bb.width > 10) {
-        std::cout << "Unknown shape. Width is too big to be valid. Actual: "
-                  << biggest_bb.width << ", expected less than 10." << std::endl;
-        return 0;
+        std::cout << "Width is too big to be valid. Actual: "
+                  << biggest_bb.width << ", expected in range [5, 10]." << std::endl;
+        confidence *= hard_decreasing_factor;
     }
 
     const cv::Mat source_bb = source(biggest_bb);
@@ -87,30 +91,37 @@ int main(int argc, char *argv[]) {
     }
 
     if (diff_points.empty()) {
-        std::cout << "Circle. Confidence: 1.0" << std::endl;
         const cv::Point center = (biggest_bb.br() + biggest_bb.tl()) * 0.5;
-        std::cout << "Diameter: " << biggest_bb.width << ". Center: " << center << std::endl;
+        std::cout << "Circle. Confidence: " << confidence
+                  << ". Diameter: " << biggest_bb.width
+                  << ". Center: " << center << std::endl;
         return 0;
     }
 
-    double confidence = 0.0;
-    if (diff.at<uchar>(0, 0) == 1) {
-        confidence += 0.25;
+    int missing_corners = 0;
+    if (diff.at<uchar>(0, 0) != 1) {
+        ++missing_corners;
     }
-    if (diff.at<uchar>(0, diff.cols - 1) == 1) {
-        confidence += 0.25;
+    if (diff.at<uchar>(0, diff.cols - 1) != 1) {
+        ++missing_corners;
     }
-    if (diff.at<uchar>(diff.rows - 1, 0) == 1) {
-        confidence += 0.25;
+    if (diff.at<uchar>(diff.rows - 1, 0) != 1) {
+        ++missing_corners;
     }
-    if (diff.at<uchar>(diff.rows - 1, diff.cols - 1) == 1) {
-        confidence += 0.25;
+    if (diff.at<uchar>(diff.rows - 1, diff.cols - 1) != 1) {
+        ++missing_corners;
     }
 
-    std::cout << "Square. Confidence: " << confidence << std::endl;
-    std::cout << "Side length: " << biggest_bb.width << ". Top left corner: " << biggest_bb.tl() << std::endl;
+    confidence *= std::pow(decreasing_factor, missing_corners);
 
+    if (confidence < 0.5 || missing_corners == 4) {
+        std::cout << "Unknown shape. Confidence: " << confidence << std::endl;
+        return 0;
+    }
 
+    std::cout << "Square. Confidence: " << confidence
+              << ". Side length: " << biggest_bb.width
+              << ". Top left corner: " << biggest_bb.tl() << std::endl;
 
     return 0;
 }
