@@ -22,20 +22,18 @@ int main(int argc, char *argv[]) {
     const int lines_number  = 15;
     const int symbols_number  = 15;
 
-    cv::Mat binary(lines_number, symbols_number, CV_8UC1);
+    cv::Mat source(lines_number, symbols_number, CV_8UC1);
 
     for (int i = 0; i < lines_number; ++i) {
         std::string line;
         std::getline(infile, line);
         for (int j = 0; j < symbols_number; ++j) {
-            binary.at<uchar>(i, j) = uchar(line.at(j) - '0');
+            source.at<uchar>(i, j) = uchar(line.at(j) - '0');
         }
     }
 
-    std::cout << "Source image = " << std::endl << binary << std::endl;
-
     cv::Mat labeled, statistics, centroid;
-    const int number_of_labels = cv::connectedComponentsWithStats(binary, labeled, statistics, centroid, 8);
+    const int number_of_labels = cv::connectedComponentsWithStats(source, labeled, statistics, centroid, 8);
 
     cv::Rect biggest_bb;
 
@@ -66,18 +64,18 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
+    const cv::Mat source_bb = source(biggest_bb);
+    std::cout << "Source image bounding box: " << std::endl << source_bb << std::endl;
+
     uchar kernel_data[9] = {0, 1, 0, 1, 1, 1, 0, 1, 0};
     const cv::Mat kernel = cv::Mat(3, 3, CV_8UC1, kernel_data);
 
-    cv::Mat opened = cv::Mat::zeros(binary.size(), CV_8UC1);
-    morphologyEx(binary, opened, cv::MORPH_OPEN, kernel);
-    std::cout << "Opened image = " << std::endl << opened << std::endl;
+    cv::Mat opened_bb = cv::Mat::zeros(source_bb.size(), CV_8UC1);
+    morphologyEx(source_bb, opened_bb, cv::MORPH_OPEN, kernel);
+    std::cout << "Opened image: " << std::endl << opened_bb << std::endl;
 
-    cv::Mat binary_bb = binary(biggest_bb);
-    cv::Mat opened_bb = opened(biggest_bb);
-
-    const cv::Mat diff = binary_bb - opened_bb;
-    std::cout << "Diff image = " << std::endl << diff << std::endl;
+    const cv::Mat diff = source_bb - opened_bb;
+    std::cout << "Diff image: " << std::endl << diff << std::endl;
 
     std::vector<cv::Point> diff_points;
     for (int y = 0; y < diff.rows; ++y) {
